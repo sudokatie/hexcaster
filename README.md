@@ -57,6 +57,19 @@ cargo build --release
 5. Reach the stairs (>) to descend
 6. Survive 3 floors to win!
 
+## Roadmap
+
+### v0.2 (Planned)
+- [ ] Ranged enemy AI (keep distance, cast spells)
+- [ ] Patrol enemy AI (wander until player spotted)
+- [ ] More spell combinations (light, dark, poison, wall, chain)
+
+### v0.3 (Planned)
+- [ ] Boss encounters at floor ends
+- [ ] More dungeon floor types
+
+See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
+
 ## License
 
 MIT
