@@ -76,17 +76,14 @@ pub fn craft_spell(runes: &[Rune]) -> Option<Spell> {
         Shape::Cone => 3,
         Shape::Ring => 3,
         Shape::Burst => 4,
+        Shape::Wall => 3,
+        Shape::Chain => 4,
+        Shape::Nova => 5,
     };
     let modifier_cost: i32 = modifiers.len() as i32;
     let ap_cost = shape_cost + modifier_cost;
 
-    let base_range = match shape {
-        Shape::Point => 5,
-        Shape::Line => 6,
-        Shape::Cone => 4,
-        Shape::Ring => 4,
-        Shape::Burst => 3,
-    };
+    let base_range = shape.base_range();
 
     Some(Spell {
         elements,
@@ -110,6 +107,24 @@ pub fn get_targets(spell: &Spell, origin: Hex, target: Hex) -> Vec<Hex> {
         }
         Shape::Ring => ring(target, 2),
         Shape::Burst => range(target, 2),
+        Shape::Wall => {
+            // Wall perpendicular to aim direction at target location
+            let direction = find_direction(origin, target);
+            let perp_dir = (direction + 2) % 6; // 90 degrees rotation
+            let mut targets = vec![target];
+            let perp_hex = crate::hex::DIRECTIONS[perp_dir];
+            targets.push(target + perp_hex);
+            targets.push(target - perp_hex);
+            targets
+        }
+        Shape::Chain => {
+            // Starts at target, implementation for chaining handled by spell resolver
+            vec![target]
+        }
+        Shape::Nova => {
+            // Ring around caster
+            ring(origin, 2)
+        }
     }
 }
 

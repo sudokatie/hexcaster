@@ -8,6 +8,9 @@ pub enum Element {
     Lightning,
     Earth,
     Void,
+    Light,
+    Dark,
+    Poison,
 }
 
 impl Element {
@@ -18,6 +21,9 @@ impl Element {
             Element::Lightning => '⚡',
             Element::Earth => '🗿',
             Element::Void => '◯',
+            Element::Light => '☀',
+            Element::Dark => '🌑',
+            Element::Poison => '☠',
         }
     }
 
@@ -28,6 +34,22 @@ impl Element {
             Element::Lightning => "Lightning",
             Element::Earth => "Earth",
             Element::Void => "Void",
+            Element::Light => "Light",
+            Element::Dark => "Dark",
+            Element::Poison => "Poison",
+        }
+    }
+
+    /// Get the elemental opposition (for resistance/weakness).
+    pub fn opposed(&self) -> Option<Element> {
+        match self {
+            Element::Fire => Some(Element::Ice),
+            Element::Ice => Some(Element::Fire),
+            Element::Lightning => Some(Element::Earth),
+            Element::Earth => Some(Element::Lightning),
+            Element::Light => Some(Element::Dark),
+            Element::Dark => Some(Element::Light),
+            _ => None,
         }
     }
 }
@@ -40,6 +62,9 @@ pub enum Shape {
     Cone,  // Cone in direction
     Ring,  // Circle around target
     Burst, // Filled circle around target
+    Wall,  // Line perpendicular to aim direction
+    Chain, // Jumps between nearby targets
+    Nova,  // Ring around caster
 }
 
 impl Shape {
@@ -50,6 +75,23 @@ impl Shape {
             Shape::Cone => "Cone",
             Shape::Ring => "Ring",
             Shape::Burst => "Burst",
+            Shape::Wall => "Wall",
+            Shape::Chain => "Chain",
+            Shape::Nova => "Nova",
+        }
+    }
+
+    /// Get the base range for this shape.
+    pub fn base_range(&self) -> i32 {
+        match self {
+            Shape::Point => 5,
+            Shape::Line => 4,
+            Shape::Cone => 3,
+            Shape::Ring => 4,
+            Shape::Burst => 3,
+            Shape::Wall => 4,
+            Shape::Chain => 6,
+            Shape::Nova => 0, // centered on caster
         }
     }
 }
@@ -62,6 +104,10 @@ pub enum Modifier {
     Duration, // +status duration
     Split,    // Multiple projectiles
     Echo,     // Cast twice
+    Homing,   // Seeks targets
+    Piercing, // Ignores armor/obstacles
+    Vampiric, // Heals caster
+    Silent,   // No aggro generation
 }
 
 impl Modifier {
@@ -72,6 +118,25 @@ impl Modifier {
             Modifier::Duration => "Duration",
             Modifier::Split => "Split",
             Modifier::Echo => "Echo",
+            Modifier::Homing => "Homing",
+            Modifier::Piercing => "Piercing",
+            Modifier::Vampiric => "Vampiric",
+            Modifier::Silent => "Silent",
+        }
+    }
+
+    /// Get the mana cost multiplier for this modifier.
+    pub fn cost_multiplier(&self) -> f32 {
+        match self {
+            Modifier::Power => 1.5,
+            Modifier::Range => 1.2,
+            Modifier::Duration => 1.3,
+            Modifier::Split => 1.8,
+            Modifier::Echo => 2.0,
+            Modifier::Homing => 1.4,
+            Modifier::Piercing => 1.6,
+            Modifier::Vampiric => 1.7,
+            Modifier::Silent => 1.1,
         }
     }
 }
