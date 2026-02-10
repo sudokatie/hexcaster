@@ -114,7 +114,48 @@ pub fn run_enemy_ai<T: Tile>(
                 // At optimal distance - stay put and attack
             }
             AIType::Patrol => {
-                // TODO: Implement patrol AI (wander until sees player)
+                // Patrol AI: wander randomly until player is spotted, then chase
+                let detection_range = aggro_range / 2; // Shorter detection range
+
+                if dist <= detection_range {
+                    // Spotted player! Chase like melee
+                    if dist == 1 {
+                        let result = melee_attack(world, entity, player, 8);
+                        if let crate::combat::AttackResult::Hit { damage, killed: _ } = result {
+                            messages.push(AIMessage(format!("Patroller attacks for {} damage!", damage)));
+                        }
+                    } else {
+                        if let Some(path) = pathfind(grid, enemy_pos, player_pos) {
+                            if path.len() > 1 {
+                                let next_pos = path[1];
+                                if entity_at(world, next_pos, entity).is_none() {
+                                    if let Ok(mut pos) = world.get::<&mut Position>(entity) {
+                                        pos.0 = next_pos;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Wandering - pick a random walkable neighbor
+                    let neighbors = enemy_pos.neighbors();
+                    let walkable: Vec<Hex> = neighbors
+                        .into_iter()
+                        .filter(|h| {
+                            grid.get(*h).map_or(false, |t| t.is_walkable())
+                                && entity_at(world, *h, entity).is_none()
+                        })
+                        .collect();
+
+                    if !walkable.is_empty() {
+                        // Use position-based deterministic "random" for consistent behavior
+                        let idx = ((enemy_pos.x.abs() + enemy_pos.y.abs()) as usize) % walkable.len();
+                        let next_pos = walkable[idx];
+                        if let Ok(mut pos) = world.get::<&mut Position>(entity) {
+                            pos.0 = next_pos;
+                        }
+                    }
+                }
             }
         }
     }
