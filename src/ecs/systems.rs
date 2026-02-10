@@ -85,7 +85,7 @@ pub fn run_enemy_ai<T: Tile>(
                     let mut best_pos = None;
                     let mut best_dist = dist;
                     for neighbor in neighbors {
-                        if grid.get(neighbor).map_or(false, |t| t.is_walkable()) {
+                        if grid.get(neighbor).is_some_and(|t| t.is_walkable()) {
                             let new_dist = neighbor.distance(player_pos);
                             if new_dist > best_dist && entity_at(world, neighbor, entity).is_none() {
                                 best_dist = new_dist;
@@ -124,14 +124,12 @@ pub fn run_enemy_ai<T: Tile>(
                         if let crate::combat::AttackResult::Hit { damage, killed: _ } = result {
                             messages.push(AIMessage(format!("Patroller attacks for {} damage!", damage)));
                         }
-                    } else {
-                        if let Some(path) = pathfind(grid, enemy_pos, player_pos) {
-                            if path.len() > 1 {
-                                let next_pos = path[1];
-                                if entity_at(world, next_pos, entity).is_none() {
-                                    if let Ok(mut pos) = world.get::<&mut Position>(entity) {
-                                        pos.0 = next_pos;
-                                    }
+                    } else if let Some(path) = pathfind(grid, enemy_pos, player_pos) {
+                        if path.len() > 1 {
+                            let next_pos = path[1];
+                            if entity_at(world, next_pos, entity).is_none() {
+                                if let Ok(mut pos) = world.get::<&mut Position>(entity) {
+                                    pos.0 = next_pos;
                                 }
                             }
                         }
@@ -142,7 +140,7 @@ pub fn run_enemy_ai<T: Tile>(
                     let walkable: Vec<Hex> = neighbors
                         .into_iter()
                         .filter(|h| {
-                            grid.get(*h).map_or(false, |t| t.is_walkable())
+                            grid.get(*h).is_some_and(|t| t.is_walkable())
                                 && entity_at(world, *h, entity).is_none()
                         })
                         .collect();
