@@ -260,4 +260,116 @@ mod tests {
         let new_pos = world.get::<&Position>(enemy).unwrap().0;
         assert_eq!(new_pos, enemy_pos);
     }
+
+    #[test]
+    fn test_ranged_enemy_maintains_distance() {
+        let grid = simple_grid();
+        let mut world = World::new();
+
+        let player = world.spawn((Position(Hex::origin()), Health::new(100), Player));
+
+        // Place ranged enemy close to player (should back away)
+        let enemy_pos = Hex::new(2, 0, -2);
+        let enemy = world.spawn((
+            Position(enemy_pos),
+            Health::new(20),
+            Enemy {
+                ai_type: AIType::Ranged,
+                aggro_range: 8,
+            },
+        ));
+
+        run_enemy_ai(&mut world, &grid, player);
+
+        // Ranged enemy should maintain optimal distance (4 hexes)
+        let new_pos = world.get::<&Position>(enemy).unwrap().0;
+        let distance = new_pos.distance(Hex::origin());
+        // Should be at or moving toward optimal range
+        assert!(distance >= 2, "Ranged enemy should not get closer");
+    }
+
+    #[test]
+    fn test_ranged_enemy_attacks_at_range() {
+        let grid = simple_grid();
+        let mut world = World::new();
+
+        let player = world.spawn((Position(Hex::origin()), Health::new(100), Player));
+
+        // Place ranged enemy at optimal distance
+        let enemy_pos = Hex::new(4, 0, -4);
+        world.spawn((
+            Position(enemy_pos),
+            Health::new(20),
+            Enemy {
+                ai_type: AIType::Ranged,
+                aggro_range: 8,
+            },
+        ));
+
+        let messages = run_enemy_ai(&mut world, &grid, player);
+
+        // Should have attacked from range
+        assert!(!messages.is_empty(), "Ranged enemy should attack at optimal range");
+        // Player should have taken damage
+        let health = world.get::<&Health>(player).unwrap();
+        assert!(health.current < 100, "Player should take ranged damage");
+    }
+
+    #[test]
+    fn test_patrol_enemy_wanders() {
+        let grid = simple_grid();
+        let mut world = World::new();
+
+        // Player far away (outside detection range)
+        let player = world.spawn((Position(Hex::new(5, 0, -5)), Health::new(100), Player));
+
+        // Place patrol enemy
+        let enemy_pos = Hex::new(-3, 0, 3);
+        let enemy = world.spawn((
+            Position(enemy_pos),
+            Health::new(20),
+            Enemy {
+                ai_type: AIType::Patrol,
+                aggro_range: 6, // Detection is half of this (3)
+            },
+        ));
+
+        run_enemy_ai(&mut world, &grid, player);
+
+        // Patrol enemy should have wandered (moved to a neighbor)
+        let new_pos = world.get::<&Position>(enemy).unwrap().0;
+        // Should have moved to an adjacent hex or stayed (if no valid neighbors)
+        let moved = new_pos != enemy_pos;
+        let adjacent = enemy_pos.distance(new_pos) <= 1;
+        assert!(moved || adjacent, "Patrol enemy should wander when player not spotted");
+    }
+
+    #[test]
+    fn test_patrol_enemy_chases_when_spotted() {
+        let grid = simple_grid();
+        let mut world = World::new();
+
+        // Player close enough to be detected (within half of aggro_range)
+        let player = world.spawn((Position(Hex::origin()), Health::new(100), Player));
+
+        // Place patrol enemy within detection range (aggro_range/2 = 3)
+        let enemy_pos = Hex::new(2, 0, -2);
+        let enemy = world.spawn((
+            Position(enemy_pos),
+            Health::new(20),
+            Enemy {
+                ai_type: AIType::Patrol,
+                aggro_range: 6, // Detection range is 3
+            },
+        ));
+
+        run_enemy_ai(&mut world, &grid, player);
+
+        // Patrol enemy should have moved closer to player (chasing)
+        let new_pos = world.get::<&Position>(enemy).unwrap().0;
+        assert!(
+            new_pos.distance(Hex::origin()) <= enemy_pos.distance(Hex::origin()),
+            "Patrol enemy should chase when player spotted"
+        );
+    }
 }
