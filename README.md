@@ -41,12 +41,15 @@ cargo build --release
 
 **Elements** (what the spell does):
 - Fire, Ice, Lightning, Earth, Void
+- Light, Dark, Poison (new in v0.2)
 
 **Shapes** (area of effect):
 - Point, Line, Cone, Ring, Burst
+- Wall, Chain, Nova (new in v0.2)
 
 **Modifiers** (enhancements):
 - Power, Range, Duration
+- Homing, Piercing, Vampiric, Silent (new in v0.2)
 
 ## How to Play
 
@@ -59,10 +62,11 @@ cargo build --release
 
 ## Roadmap
 
-### v0.2 (Planned)
-- [ ] Ranged enemy AI (keep distance, cast spells)
-- [ ] Patrol enemy AI (wander until player spotted)
-- [ ] More spell combinations (light, dark, poison, wall, chain)
+### v0.2 (Complete)
+- [x] Ranged enemy AI (maintain optimal distance, cast spells)
+- [x] Patrol enemy AI (wander until player spotted)
+- [x] More spell combinations (light, dark, poison elements; wall, chain, nova shapes)
+- [x] New modifiers (homing, piercing, vampiric, silent)
 
 ### v0.3 (Planned)
 - [ ] Boss encounters at floor ends
