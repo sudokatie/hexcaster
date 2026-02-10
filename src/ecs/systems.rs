@@ -2,7 +2,10 @@
 
 use hecs::{Entity, World};
 
-use crate::combat::{entity_at, melee_attack, remove_dead};
+use crate::combat::{
+    entity_at, melee_attack, ranged_attack, remove_dead, BASE_RANGED_DAMAGE,
+    RANGED_OPTIMAL_DISTANCE,
+};
 use crate::ecs::components::{AIType, Enemy, Position};
 use crate::hex::{pathfind, Hex, HexGrid, Tile};
 
@@ -62,7 +65,53 @@ pub fn run_enemy_ai<T: Tile>(
                 }
             }
             AIType::Ranged => {
-                // TODO: Implement ranged AI (keep distance, cast spells)
+                // Ranged AI: maintain optimal distance and attack from afar
+                let optimal_dist = RANGED_OPTIMAL_DISTANCE;
+                let max_range = aggro_range;
+
+                if dist <= max_range && dist >= 2 {
+                    // In range and not too close - attack!
+                    let result = ranged_attack(world, entity, player, BASE_RANGED_DAMAGE);
+                    if let crate::combat::AttackResult::Hit { damage, killed: _ } = result {
+                        messages.push(AIMessage(format!("Enemy casts a spell for {} damage!", damage)));
+                    }
+                }
+
+                // Movement: try to maintain optimal distance
+                if dist < optimal_dist - 1 {
+                    // Too close - retreat
+                    // Find hex that's further from player
+                    let neighbors = enemy_pos.neighbors();
+                    let mut best_pos = None;
+                    let mut best_dist = dist;
+                    for neighbor in neighbors {
+                        if grid.get(neighbor).map_or(false, |t| t.is_walkable()) {
+                            let new_dist = neighbor.distance(player_pos);
+                            if new_dist > best_dist && entity_at(world, neighbor, entity).is_none() {
+                                best_dist = new_dist;
+                                best_pos = Some(neighbor);
+                            }
+                        }
+                    }
+                    if let Some(next_pos) = best_pos {
+                        if let Ok(mut pos) = world.get::<&mut Position>(entity) {
+                            pos.0 = next_pos;
+                        }
+                    }
+                } else if dist > max_range {
+                    // Too far - approach using pathfinding
+                    if let Some(path) = pathfind(grid, enemy_pos, player_pos) {
+                        if path.len() > 1 {
+                            let next_pos = path[1];
+                            if entity_at(world, next_pos, entity).is_none() {
+                                if let Ok(mut pos) = world.get::<&mut Position>(entity) {
+                                    pos.0 = next_pos;
+                                }
+                            }
+                        }
+                    }
+                }
+                // At optimal distance - stay put and attack
             }
             AIType::Patrol => {
                 // TODO: Implement patrol AI (wander until sees player)

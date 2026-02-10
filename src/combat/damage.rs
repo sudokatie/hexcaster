@@ -57,6 +57,12 @@ pub const BASE_MELEE_DAMAGE: i32 = 15;
 /// Cost in AP for a melee attack.
 pub const MELEE_AP_COST: i32 = 1;
 
+/// Base ranged damage.
+pub const BASE_RANGED_DAMAGE: i32 = 12;
+
+/// Optimal range for ranged enemies.
+pub const RANGED_OPTIMAL_DISTANCE: i32 = 4;
+
 /// Find an entity at the given position (excluding the attacker).
 pub fn entity_at(world: &World, pos: Hex, exclude: Entity) -> Option<Entity> {
     for (entity, position) in world.query::<&Position>().iter() {
@@ -82,6 +88,31 @@ pub fn melee_attack(
         };
 
         let damage = calculate_damage(base_damage, 0); // No resistance for now
+        health.take_damage(damage);
+        (health.is_dead(), damage)
+    };
+
+    AttackResult::Hit {
+        damage: actual_damage,
+        killed,
+    }
+}
+
+/// Perform a ranged attack against a target within range.
+pub fn ranged_attack(
+    world: &mut World,
+    _attacker: Entity,
+    target: Entity,
+    base_damage: i32,
+) -> AttackResult {
+    // Apply damage to target (same as melee for now, could add miss chance later)
+    let (killed, actual_damage) = {
+        let mut health = match world.get::<&mut Health>(target) {
+            Ok(h) => h,
+            Err(_) => return AttackResult::NoTarget,
+        };
+
+        let damage = calculate_damage(base_damage, 0);
         health.take_damage(damage);
         (health.is_dead(), damage)
     };
