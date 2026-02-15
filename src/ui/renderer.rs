@@ -50,6 +50,7 @@ pub fn render_map(
                 DungeonTile::Floor => ('.', Color::DarkGray),
                 DungeonTile::Wall => ('#', Color::Gray),
                 DungeonTile::Stairs => ('>', Color::Yellow),
+                DungeonTile::BossFloor => ('.', Color::Magenta), // Boss room floor
             };
             chars.push((sx, sy, ch, color));
         }

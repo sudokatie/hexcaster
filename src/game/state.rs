@@ -61,7 +61,9 @@ impl Game {
     pub fn new() -> Self {
         let mut rng = StdRng::from_entropy();
         let config = DungeonConfig::default();
-        let (grid, player_start) = generate(&config, &mut rng);
+        let result = generate(&config, &mut rng);
+        let grid = result.grid;
+        let player_start = result.player_start;
 
         let mut world = World::new();
 
@@ -510,11 +512,34 @@ impl Game {
             ..Default::default()
         };
 
-        let (grid, start) = generate(&config, &mut self.rng);
-        self.grid = grid;
+        let result = generate(&config, &mut self.rng);
+        let player_start = result.player_start;
+        let boss_spawn = result.boss_spawn;
+        self.grid = result.grid;
 
         if let Ok(mut pos) = self.world.get::<&mut Position>(self.player) {
-            pos.0 = start;
+            pos.0 = player_start;
+        }
+        
+        // Spawn boss if boss room exists
+        if let Some(boss_pos) = boss_spawn {
+            use crate::ecs::components::{Boss, BossType, Display, Enemy, AIType, Health, Position};
+            let boss_type = BossType::for_floor(new_floor);
+            let health = boss_type.base_health() + (new_floor - 1) * 20; // Scale with floor
+            
+            self.world.spawn((
+                Position(boss_pos),
+                Health::new(health),
+                Boss::new(boss_type),
+                Enemy {
+                    ai_type: AIType::Ranged, // Bosses use ranged AI
+                    aggro_range: 10,
+                },
+                Display {
+                    glyph: boss_type.glyph(),
+                    color: boss_type.color(),
+                },
+            ));
         }
 
         self.state = GameState::Playing { floor: new_floor };
@@ -525,7 +550,7 @@ impl Game {
         let floor_tiles: Vec<Hex> = self
             .grid
             .iter()
-            .filter(|(h, t)| **t == DungeonTile::Floor && h.distance(start) > 3)
+            .filter(|(h, t)| **t == DungeonTile::Floor && h.distance(player_start) > 3)
             .map(|(h, _)| h)
             .collect();
 

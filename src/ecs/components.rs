@@ -129,3 +129,182 @@ pub struct Display {
     pub glyph: char,
     pub color: (u8, u8, u8),
 }
+
+/// Boss types with unique mechanics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BossType {
+    /// Fire Elemental - AOE fire attacks, enrages at low health
+    FireLord,
+    /// Ice Elemental - Slows player, summons ice walls
+    FrostQueen,
+    /// Shadow creature - teleports, creates duplicates
+    VoidWraith,
+}
+
+impl BossType {
+    /// Get the boss name for display.
+    pub fn name(&self) -> &'static str {
+        match self {
+            BossType::FireLord => "Fire Lord",
+            BossType::FrostQueen => "Frost Queen",
+            BossType::VoidWraith => "Void Wraith",
+        }
+    }
+    
+    /// Get the boss glyph.
+    pub fn glyph(&self) -> char {
+        match self {
+            BossType::FireLord => 'F',
+            BossType::FrostQueen => 'Q',
+            BossType::VoidWraith => 'V',
+        }
+    }
+    
+    /// Get the boss color.
+    pub fn color(&self) -> (u8, u8, u8) {
+        match self {
+            BossType::FireLord => (255, 100, 50),     // Orange-red
+            BossType::FrostQueen => (150, 200, 255),  // Ice blue
+            BossType::VoidWraith => (180, 50, 255),   // Purple
+        }
+    }
+    
+    /// Get base health for this boss (scales with floor).
+    pub fn base_health(&self) -> i32 {
+        match self {
+            BossType::FireLord => 100,
+            BossType::FrostQueen => 80,
+            BossType::VoidWraith => 60,
+        }
+    }
+    
+    /// Get the boss for a given floor number.
+    pub fn for_floor(floor: i32) -> Self {
+        match floor % 3 {
+            1 => BossType::FireLord,
+            2 => BossType::FrostQueen,
+            _ => BossType::VoidWraith,
+        }
+    }
+}
+
+/// Boss component for boss enemies.
+#[derive(Debug, Clone)]
+pub struct Boss {
+    pub boss_type: BossType,
+    /// Current phase (bosses may have multiple phases).
+    pub phase: u8,
+    /// Whether the boss is enraged (low health).
+    pub enraged: bool,
+}
+
+impl Boss {
+    pub fn new(boss_type: BossType) -> Self {
+        Self {
+            boss_type,
+            phase: 1,
+            enraged: false,
+        }
+    }
+    
+    /// Check if boss should enrage based on health.
+    pub fn check_enrage(&mut self, health_percent: f32) {
+        if health_percent <= 0.3 && !self.enraged {
+            self.enraged = true;
+        }
+    }
+}
+
+/// Loot drop quality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LootQuality {
+    Common,
+    Rare,
+    Epic,
+}
+
+/// Special loot from bosses.
+#[derive(Debug, Clone)]
+pub struct BossLoot {
+    pub quality: LootQuality,
+    /// Number of runes dropped.
+    pub rune_count: usize,
+}
+
+impl BossLoot {
+    pub fn from_boss(boss_type: BossType, floor: i32) -> Self {
+        let quality = if floor >= 3 {
+            LootQuality::Epic
+        } else if floor >= 2 {
+            LootQuality::Rare
+        } else {
+            LootQuality::Common
+        };
+        
+        let rune_count = match quality {
+            LootQuality::Common => 2,
+            LootQuality::Rare => 3,
+            LootQuality::Epic => 5,
+        };
+        
+        // Void Wraith drops extra loot
+        let rune_count = if boss_type == BossType::VoidWraith {
+            rune_count + 1
+        } else {
+            rune_count
+        };
+        
+        Self { quality, rune_count }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_boss_type_for_floor() {
+        assert_eq!(BossType::for_floor(1), BossType::FireLord);
+        assert_eq!(BossType::for_floor(2), BossType::FrostQueen);
+        assert_eq!(BossType::for_floor(3), BossType::VoidWraith);
+        assert_eq!(BossType::for_floor(4), BossType::FireLord); // Cycles
+    }
+    
+    #[test]
+    fn test_boss_enrage() {
+        let mut boss = Boss::new(BossType::FireLord);
+        assert!(!boss.enraged);
+        
+        boss.check_enrage(0.5);
+        assert!(!boss.enraged);
+        
+        boss.check_enrage(0.25);
+        assert!(boss.enraged);
+    }
+    
+    #[test]
+    fn test_boss_loot_quality() {
+        let loot1 = BossLoot::from_boss(BossType::FireLord, 1);
+        assert_eq!(loot1.quality, LootQuality::Common);
+        assert_eq!(loot1.rune_count, 2);
+        
+        let loot3 = BossLoot::from_boss(BossType::FireLord, 3);
+        assert_eq!(loot3.quality, LootQuality::Epic);
+        assert_eq!(loot3.rune_count, 5);
+    }
+    
+    #[test]
+    fn test_void_wraith_extra_loot() {
+        let void_loot = BossLoot::from_boss(BossType::VoidWraith, 1);
+        let fire_loot = BossLoot::from_boss(BossType::FireLord, 1);
+        assert_eq!(void_loot.rune_count, fire_loot.rune_count + 1);
+    }
+    
+    #[test]
+    fn test_boss_display() {
+        let boss = BossType::FireLord;
+        assert_eq!(boss.name(), "Fire Lord");
+        assert_eq!(boss.glyph(), 'F');
+        assert_eq!(boss.color(), (255, 100, 50));
+    }
+}

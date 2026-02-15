@@ -9,15 +9,16 @@ pub enum DungeonTile {
     Floor,
     Wall,
     Stairs,
+    BossFloor, // Special floor for boss room
 }
 
 impl crate::hex::Tile for DungeonTile {
     fn is_walkable(&self) -> bool {
-        matches!(self, DungeonTile::Floor | DungeonTile::Stairs)
+        matches!(self, DungeonTile::Floor | DungeonTile::Stairs | DungeonTile::BossFloor)
     }
 
     fn is_transparent(&self) -> bool {
-        matches!(self, DungeonTile::Floor | DungeonTile::Stairs)
+        matches!(self, DungeonTile::Floor | DungeonTile::Stairs | DungeonTile::BossFloor)
     }
 }
 
@@ -28,6 +29,8 @@ pub struct DungeonConfig {
     pub height: i32,
     pub num_rooms: usize,
     pub floor_number: i32,
+    /// Whether to generate a boss room at the end.
+    pub has_boss: bool,
 }
 
 impl Default for DungeonConfig {
@@ -37,12 +40,21 @@ impl Default for DungeonConfig {
             height: 30,
             num_rooms: 6,
             floor_number: 1,
+            has_boss: true,
         }
     }
 }
 
+/// Result of dungeon generation.
+#[derive(Debug)]
+pub struct DungeonResult {
+    pub grid: HexGrid<DungeonTile>,
+    pub player_start: Hex,
+    pub boss_spawn: Option<Hex>,
+}
+
 /// Generate a dungeon.
-pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> (HexGrid<DungeonTile>, Hex) {
+pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> DungeonResult {
     let mut grid = HexGrid::new();
 
     // Fill with walls first
@@ -54,10 +66,16 @@ pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> (HexGrid<DungeonT
         }
     }
 
-    // Generate rooms
+    // Generate rooms (fewer regular rooms if boss room needed)
+    let regular_rooms = if config.has_boss {
+        config.num_rooms.saturating_sub(1)
+    } else {
+        config.num_rooms
+    };
+    
     let mut rooms: Vec<(Hex, i32)> = Vec::new();
     let mut attempts = 0;
-    while rooms.len() < config.num_rooms && attempts < 100 {
+    while rooms.len() < regular_rooms && attempts < 100 {
         let x = rng.gen_range(-(config.width / 3)..(config.width / 3));
         let y = rng.gen_range(-(config.height / 3)..(config.height / 3));
         let radius = rng.gen_range(2..=4);
@@ -78,6 +96,19 @@ pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> (HexGrid<DungeonT
         attempts += 1;
     }
 
+    // Generate boss room if needed (larger than regular rooms)
+    let boss_spawn = if config.has_boss {
+        let boss_room = generate_boss_room(&mut grid, &rooms, config, rng);
+        if let Some((center, radius)) = boss_room {
+            rooms.push((center, radius));
+            Some(center)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Connect rooms with corridors
     for i in 0..rooms.len().saturating_sub(1) {
         let (from, _) = rooms[i];
@@ -93,7 +124,7 @@ pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> (HexGrid<DungeonT
         }
     }
 
-    // Place stairs in last room
+    // Place stairs in boss room or last room
     if let Some((last_room, _)) = rooms.last() {
         grid.set(*last_room, DungeonTile::Stairs);
     }
@@ -101,7 +132,43 @@ pub fn generate(config: &DungeonConfig, rng: &mut impl Rng) -> (HexGrid<DungeonT
     // Player starts in first room
     let player_start = rooms.first().map(|(c, _)| *c).unwrap_or(Hex::origin());
 
-    (grid, player_start)
+    DungeonResult {
+        grid,
+        player_start,
+        boss_spawn,
+    }
+}
+
+/// Generate a boss room (larger than regular rooms).
+fn generate_boss_room(
+    grid: &mut HexGrid<DungeonTile>,
+    existing_rooms: &[(Hex, i32)],
+    config: &DungeonConfig,
+    rng: &mut impl Rng,
+) -> Option<(Hex, i32)> {
+    let boss_radius = 5; // Boss rooms are larger
+    
+    for _ in 0..50 {
+        // Try to place boss room at edge of map
+        let x = rng.gen_range(-(config.width / 4)..(config.width / 4));
+        let y = rng.gen_range(-(config.height / 4)..(config.height / 4));
+        
+        if let Some(center) = try_create_hex(x, y) {
+            // Check overlap with existing rooms (need more space for boss)
+            let overlaps = existing_rooms
+                .iter()
+                .any(|(rc, rr)| center.distance(*rc) < boss_radius + rr + 3);
+            
+            if !overlaps {
+                // Carve boss room with special floor
+                for hex in range(center, boss_radius) {
+                    grid.set(hex, DungeonTile::BossFloor);
+                }
+                return Some((center, boss_radius));
+            }
+        }
+    }
+    None
 }
 
 fn try_create_hex(x: i32, y: i32) -> Option<Hex> {
@@ -119,9 +186,9 @@ mod tests {
     fn test_generate_has_floor() {
         let config = DungeonConfig::default();
         let mut rng = StdRng::seed_from_u64(42);
-        let (grid, _) = generate(&config, &mut rng);
+        let result = generate(&config, &mut rng);
 
-        let has_floor = grid.iter().any(|(_, t)| *t == DungeonTile::Floor);
+        let has_floor = result.grid.iter().any(|(_, t)| *t == DungeonTile::Floor);
         assert!(has_floor);
     }
 
@@ -129,9 +196,9 @@ mod tests {
     fn test_generate_has_stairs() {
         let config = DungeonConfig::default();
         let mut rng = StdRng::seed_from_u64(42);
-        let (grid, _) = generate(&config, &mut rng);
+        let result = generate(&config, &mut rng);
 
-        let has_stairs = grid.iter().any(|(_, t)| *t == DungeonTile::Stairs);
+        let has_stairs = result.grid.iter().any(|(_, t)| *t == DungeonTile::Stairs);
         assert!(has_stairs);
     }
 
@@ -139,8 +206,43 @@ mod tests {
     fn test_player_start_is_floor() {
         let config = DungeonConfig::default();
         let mut rng = StdRng::seed_from_u64(42);
-        let (grid, start) = generate(&config, &mut rng);
+        let result = generate(&config, &mut rng);
 
-        assert_eq!(grid.get(start), Some(&DungeonTile::Floor));
+        let tile = result.grid.get(result.player_start);
+        assert!(tile == Some(&DungeonTile::Floor) || tile == Some(&DungeonTile::BossFloor));
+    }
+    
+    #[test]
+    fn test_generate_boss_room() {
+        let config = DungeonConfig {
+            has_boss: true,
+            ..Default::default()
+        };
+        let mut rng = StdRng::seed_from_u64(42);
+        let result = generate(&config, &mut rng);
+        
+        // Should have boss spawn location
+        assert!(result.boss_spawn.is_some());
+        
+        // Should have boss floor tiles
+        let has_boss_floor = result.grid.iter().any(|(_, t)| *t == DungeonTile::BossFloor);
+        assert!(has_boss_floor);
+    }
+    
+    #[test]
+    fn test_no_boss_room() {
+        let config = DungeonConfig {
+            has_boss: false,
+            ..Default::default()
+        };
+        let mut rng = StdRng::seed_from_u64(42);
+        let result = generate(&config, &mut rng);
+        
+        // Should not have boss spawn location
+        assert!(result.boss_spawn.is_none());
+        
+        // Should not have boss floor tiles
+        let has_boss_floor = result.grid.iter().any(|(_, t)| *t == DungeonTile::BossFloor);
+        assert!(!has_boss_floor);
     }
 }
