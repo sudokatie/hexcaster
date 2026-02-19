@@ -176,7 +176,7 @@ mod tests {
         for q in -5..=5 {
             for r in -5..=5 {
                 let s = -q - r;
-                if let Ok(_) = std::panic::catch_unwind(|| Hex::new(q, r, s)) {
+                if std::panic::catch_unwind(|| Hex::new(q, r, s)).is_ok() {
                     grid.set(Hex::new(q, r, s), DungeonTile::Floor);
                 }
             }
