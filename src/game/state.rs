@@ -48,6 +48,14 @@ pub struct Game {
     pub grimoire: Vec<Spell>,
     pub messages: Vec<String>,
     pub rng: StdRng,
+    /// Whether this is a daily challenge run.
+    pub is_daily: bool,
+    /// Seed used for this run.
+    pub seed: u64,
+    /// Number of turns taken.
+    pub turns_taken: u32,
+    /// Number of enemies killed.
+    pub enemies_killed: u32,
 }
 
 impl Default for Game {
@@ -59,7 +67,12 @@ impl Default for Game {
 impl Game {
     /// Create a new game.
     pub fn new() -> Self {
-        let mut rng = StdRng::from_entropy();
+        Self::new_with_seed(rand::random())
+    }
+
+    /// Create a new game with a specific seed.
+    pub fn new_with_seed(seed: u64) -> Self {
+        let mut rng = StdRng::seed_from_u64(seed);
         let config = DungeonConfig::default();
         let result = generate(&config, &mut rng);
         let grid = result.grid;
@@ -139,7 +152,23 @@ impl Game {
                 "Collect runes (*) and craft spells to survive!".to_string(),
             ],
             rng,
+            is_daily: false,
+            seed,
+            turns_taken: 0,
+            enemies_killed: 0,
         }
+    }
+
+    /// Create a new daily challenge game using today's seed.
+    pub fn new_daily() -> Self {
+        let seed = crate::daily::today_seed();
+        let mut game = Self::new_with_seed(seed);
+        game.is_daily = true;
+        game.messages.clear();
+        game.messages.push(format!("Daily Challenge: {}", crate::daily::today_string()));
+        game.messages.push("Same dungeon for everyone today!".to_string());
+        game.messages.push("Move: qweasd | Attack: space | Craft: r | Cast: c".to_string());
+        game
     }
 
     /// Run the game.
