@@ -9,3 +9,4 @@ pub mod game;
 pub mod hex;
 pub mod magic;
 pub mod ui;
+pub mod unlocks;
