@@ -217,10 +217,10 @@ impl AchievementStore {
         
         // Check if all 3 boss types defeated
         let all_bosses = ["FireLord", "FrostQueen", "VoidWraith"];
-        if all_bosses.iter().all(|b| self.bosses_defeated.contains(*b)) {
-            if self.unlock(Achievement::BossSlayer) {
-                newly_unlocked.push(Achievement::BossSlayer);
-            }
+        if all_bosses.iter().all(|b| self.bosses_defeated.contains(*b))
+            && self.unlock(Achievement::BossSlayer)
+        {
+            newly_unlocked.push(Achievement::BossSlayer);
         }
         
         newly_unlocked
