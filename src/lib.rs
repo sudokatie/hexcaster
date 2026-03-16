@@ -8,5 +8,6 @@ pub mod ecs;
 pub mod game;
 pub mod hex;
 pub mod magic;
+pub mod online;
 pub mod ui;
 pub mod unlocks;
