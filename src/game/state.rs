@@ -731,6 +731,43 @@ impl Game {
             _ => {}
         }
     }
+
+    /// Get the current floor number.
+    pub fn floor(&self) -> i32 {
+        match self.state {
+            GameState::Playing { floor } => floor,
+            GameState::Victory => 4, // Beat floor 3
+            _ => 1,
+        }
+    }
+
+    /// Get the player's current health.
+    pub fn player_health(&self) -> i32 {
+        self.world
+            .get::<&Health>(self.player)
+            .map(|h| h.current)
+            .unwrap_or(0)
+    }
+
+    /// Calculate the final score for this run.
+    pub fn calculate_score(&self) -> u32 {
+        crate::daily::calculate_score(
+            self.floor(),
+            self.turns_taken,
+            self.player_health(),
+            self.enemies_killed,
+        )
+    }
+
+    /// Get run statistics for leaderboard submission.
+    pub fn run_stats(&self) -> (u32, u32, u32, u64) {
+        (
+            self.calculate_score(),
+            self.floor() as u32,
+            self.turns_taken,
+            self.seed,
+        )
+    }
 }
 
 fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
@@ -804,5 +841,36 @@ mod tests {
         let game = Game::new();
         let has_inventory = game.world.get::<&Inventory>(game.player).is_ok();
         assert!(has_inventory, "Player should have inventory component");
+    }
+
+    #[test]
+    fn test_floor_returns_current() {
+        let game = Game::new();
+        assert_eq!(game.floor(), 1);
+    }
+
+    #[test]
+    fn test_player_health() {
+        let game = Game::new();
+        assert!(game.player_health() > 0);
+        assert_eq!(game.player_health(), 100); // Default starting health
+    }
+
+    #[test]
+    fn test_calculate_score() {
+        let game = Game::new();
+        let score = game.calculate_score();
+        // Floor 1 * 1000 + efficiency bonus + health bonus + kills = should be positive
+        assert!(score > 0);
+    }
+
+    #[test]
+    fn test_run_stats() {
+        let game = Game::new();
+        let (score, floor, turns, seed) = game.run_stats();
+        assert!(score > 0);
+        assert_eq!(floor, 1);
+        assert_eq!(turns, 0);
+        assert!(seed > 0);
     }
 }
