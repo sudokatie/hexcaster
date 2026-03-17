@@ -107,11 +107,13 @@ impl LeaderboardClient {
     }
 
     /// Build the URL for a leaderboard endpoint
+    #[allow(dead_code)] // Will be used when HTTP client is implemented
     fn leaderboard_url(&self, period: LeaderboardPeriod) -> String {
         format!("{}/leaderboard/{}", self.config.server_url, period)
     }
 
     /// Build the URL for score submission
+    #[allow(dead_code)] // Will be used when HTTP client is implemented
     fn submit_url(&self) -> String {
         format!("{}/submit", self.config.server_url)
     }
