@@ -103,8 +103,26 @@ The base elements (Fire, Ice, Lightning, Earth), shapes (Point, Line, Cone, Ring
 - [x] Daily challenges with leaderboards
 - [x] Achievement system (22 achievements)
 - [x] Unlockable content (11 runes tied to achievements)
+- [x] Online leaderboards (optional)
 
-See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
+## Online Features
+
+The game supports optional online leaderboards. Enable them by building with the `online` feature:
+
+```bash
+cargo build --release --features online
+```
+
+Configure your player name in `~/.config/hexcaster/config.yaml`:
+
+```yaml
+online:
+  enabled: true
+  player_name: "YourName"
+  server_url: "https://hexcaster.blackabee.com/api"
+```
+
+When enabled, your daily challenge scores are submitted to the global leaderboard. You can compete with other players for the best daily run.
 
 ## License
 

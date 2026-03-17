@@ -23,7 +23,7 @@ impl std::fmt::Display for LeaderboardPeriod {
         match self {
             Self::Daily => write!(f, "daily"),
             Self::Weekly => write!(f, "weekly"),
-            Self::AllTime => write!(f, "all-time"),
+            Self::AllTime => write!(f, "alltime"),
         }
     }
 }
@@ -122,6 +122,8 @@ pub struct OnlineConfig {
     pub enabled: bool,
     pub server_url: String,
     pub player_name: Option<String>,
+    #[serde(default)]
+    pub signature_secret: Option<String>,
 }
 
 impl Default for OnlineConfig {
@@ -130,6 +132,7 @@ impl Default for OnlineConfig {
             enabled: false,
             server_url: "https://hexcaster.blackabee.com/api".to_string(),
             player_name: None,
+            signature_secret: None,
         }
     }
 }
@@ -142,7 +145,7 @@ mod type_tests {
     fn test_period_display() {
         assert_eq!(LeaderboardPeriod::Daily.to_string(), "daily");
         assert_eq!(LeaderboardPeriod::Weekly.to_string(), "weekly");
-        assert_eq!(LeaderboardPeriod::AllTime.to_string(), "all-time");
+        assert_eq!(LeaderboardPeriod::AllTime.to_string(), "alltime");
     }
 
     #[test]

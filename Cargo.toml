@@ -18,5 +18,13 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
 thiserror = "2.0"
 
+[features]
+default = []
+online = ["ureq"]
+
+[dependencies.ureq]
+version = "2.9"
+optional = true
+
 [dev-dependencies]
 tempfile = "3.14"

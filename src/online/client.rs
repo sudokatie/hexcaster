@@ -44,9 +44,45 @@ impl LeaderboardClient {
     }
 
     /// Fetch leaderboard entries for a given period
-    /// 
-    /// Note: This is a placeholder that returns mock data.
-    /// Real implementation would use reqwest or ureq for HTTP.
+    #[cfg(feature = "online")]
+    pub fn fetch_leaderboard(
+        &self,
+        period: LeaderboardPeriod,
+        limit: usize,
+    ) -> Result<LeaderboardResponse, OnlineError> {
+        if !self.config.enabled {
+            return Err(OnlineError::Disabled);
+        }
+
+        let url = format!(
+            "{}/leaderboard/{}?limit={}",
+            self.config.server_url,
+            period,
+            limit.min(100)
+        );
+
+        let response = ureq::get(&url)
+            .timeout(std::time::Duration::from_secs(10))
+            .call()
+            .map_err(|e| OnlineError::Network(e.to_string()))?;
+
+        if response.status() != 200 {
+            return Err(OnlineError::Server(format!(
+                "Server returned status {}",
+                response.status()
+            )));
+        }
+
+        let body = response
+            .into_string()
+            .map_err(|e| OnlineError::InvalidResponse(e.to_string()))?;
+
+        serde_json::from_str(&body)
+            .map_err(|e| OnlineError::InvalidResponse(e.to_string()))
+    }
+
+    /// Fetch leaderboard (offline stub when online feature disabled)
+    #[cfg(not(feature = "online"))]
     pub fn fetch_leaderboard(
         &self,
         period: LeaderboardPeriod,
@@ -56,8 +92,7 @@ impl LeaderboardClient {
             return Err(OnlineError::Disabled);
         }
 
-        // TODO: Implement actual HTTP request
-        // For now, return mock data for testing
+        // Return empty mock response when online feature is disabled
         Ok(LeaderboardResponse {
             period,
             entries: vec![],
@@ -67,9 +102,7 @@ impl LeaderboardClient {
     }
 
     /// Submit a score to the leaderboard
-    /// 
-    /// Note: This is a placeholder that validates locally.
-    /// Real implementation would POST to the server.
+    #[cfg(feature = "online")]
     pub fn submit_score(
         &self,
         score: u32,
@@ -93,12 +126,65 @@ impl LeaderboardClient {
             game_seed,
         );
 
-        // Sign the submission (would use server secret in production)
+        // Sign the submission using configured secret or default
+        let secret = self.config.signature_secret.as_deref()
+            .unwrap_or("hexcaster_default_secret");
+        submission.sign(secret.as_bytes());
+
+        let url = format!("{}/submit", self.config.server_url);
+        let body = serde_json::to_string(&submission)
+            .map_err(|e| OnlineError::InvalidResponse(e.to_string()))?;
+
+        let response = ureq::post(&url)
+            .set("Content-Type", "application/json")
+            .timeout(std::time::Duration::from_secs(10))
+            .send_string(&body)
+            .map_err(|e| OnlineError::Network(e.to_string()))?;
+
+        if response.status() != 200 {
+            return Err(OnlineError::Server(format!(
+                "Server returned status {}",
+                response.status()
+            )));
+        }
+
+        let response_body = response
+            .into_string()
+            .map_err(|e| OnlineError::InvalidResponse(e.to_string()))?;
+
+        serde_json::from_str(&response_body)
+            .map_err(|e| OnlineError::InvalidResponse(e.to_string()))
+    }
+
+    /// Submit score (offline stub when online feature disabled)
+    #[cfg(not(feature = "online"))]
+    pub fn submit_score(
+        &self,
+        score: u32,
+        floor_reached: u32,
+        turns_taken: u32,
+        game_seed: u64,
+    ) -> Result<SubmitResponse, OnlineError> {
+        if !self.config.enabled {
+            return Err(OnlineError::Disabled);
+        }
+
+        let player_name = self.config.player_name.as_ref()
+            .ok_or(OnlineError::NoPlayerName)?
+            .clone();
+
+        let mut submission = ScoreSubmission::new(
+            player_name,
+            score,
+            floor_reached,
+            turns_taken,
+            game_seed,
+        );
+
         let secret = b"placeholder_secret";
         submission.sign(secret);
 
-        // TODO: Implement actual HTTP POST
-        // For now, return success response
+        // Return mock success when online feature is disabled
         Ok(SubmitResponse {
             success: true,
             rank: Some(1),
@@ -107,13 +193,13 @@ impl LeaderboardClient {
     }
 
     /// Build the URL for a leaderboard endpoint
-    #[allow(dead_code)] // Will be used when HTTP client is implemented
+    #[allow(dead_code)]
     fn leaderboard_url(&self, period: LeaderboardPeriod) -> String {
         format!("{}/leaderboard/{}", self.config.server_url, period)
     }
 
     /// Build the URL for score submission
-    #[allow(dead_code)] // Will be used when HTTP client is implemented
+    #[allow(dead_code)]
     fn submit_url(&self) -> String {
         format!("{}/submit", self.config.server_url)
     }
@@ -128,6 +214,7 @@ mod client_tests {
             enabled: true,
             server_url: "https://test.example.com/api".to_string(),
             player_name: Some("TestPlayer".to_string()),
+            signature_secret: Some("test_secret".to_string()),
         }
     }
 
@@ -155,26 +242,6 @@ mod client_tests {
     }
 
     #[test]
-    fn test_fetch_leaderboard_mock() {
-        let client = LeaderboardClient::new(enabled_config());
-        let result = client.fetch_leaderboard(LeaderboardPeriod::Weekly, 10);
-        
-        assert!(result.is_ok());
-        let response = result.unwrap();
-        assert_eq!(response.period, LeaderboardPeriod::Weekly);
-    }
-
-    #[test]
-    fn test_submit_score_mock() {
-        let client = LeaderboardClient::new(enabled_config());
-        let result = client.submit_score(1000, 5, 100, 12345);
-        
-        assert!(result.is_ok());
-        let response = result.unwrap();
-        assert!(response.success);
-    }
-
-    #[test]
     fn test_submit_score_no_player_name() {
         let config = OnlineConfig {
             enabled: true,
@@ -199,5 +266,28 @@ mod client_tests {
             client.submit_url(),
             "https://test.example.com/api/submit"
         );
+    }
+
+    // Mock tests only run when online feature is disabled
+    #[cfg(not(feature = "online"))]
+    #[test]
+    fn test_fetch_leaderboard_mock() {
+        let client = LeaderboardClient::new(enabled_config());
+        let result = client.fetch_leaderboard(LeaderboardPeriod::Weekly, 10);
+        
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.period, LeaderboardPeriod::Weekly);
+    }
+
+    #[cfg(not(feature = "online"))]
+    #[test]
+    fn test_submit_score_mock() {
+        let client = LeaderboardClient::new(enabled_config());
+        let result = client.submit_score(1000, 5, 100, 12345);
+        
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert!(response.success);
     }
 }

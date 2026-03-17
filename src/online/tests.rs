@@ -3,12 +3,14 @@
 use super::*;
 
 #[test]
+#[ignore = "requires running server"]
 fn test_full_workflow() {
     // Create enabled config
     let config = OnlineConfig {
         enabled: true,
         server_url: "https://hexcaster.blackabee.com/api".to_string(),
         player_name: Some("IntegrationTest".to_string()),
+        signature_secret: Some("test_secret".to_string()),
     };
 
     let client = LeaderboardClient::new(config);
